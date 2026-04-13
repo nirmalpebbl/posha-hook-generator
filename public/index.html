@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Posha Hook Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --surface: #18181b;
+      --surface2: #1f1f24;
+      --border: #2e2e36;
+      --accent: #f97316;
+      --accent-glow: rgba(249, 115, 22, 0.15);
+      --text: #f4f4f5;
+      --muted: #71717a;
+      --green: #22c55e;
+      --blue: #3b82f6;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header .badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 3px 8px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      opacity: 0.8;
+    }
+
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      padding: 8px 32px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status-bar .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      margin-right: 5px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 97px);
+    }
+
+    /* ── Left Panel ── */
+    .panel-left {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      background: var(--surface);
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 10;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content { display: none; padding: 20px; }
+    .tab-content.active { display: block; }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    textarea { min-height: 80px; }
+
+    .count-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .count-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+
+    .count-val {
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .toggle-label {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .toggle-label small {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover { background: #ea6b12; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    .creator-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+
+    .chip:hover, .chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ── Schedule Tab ── */
+    .schedule-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+
+    .cron-presets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .preset-btn {
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      text-align: left;
+    }
+
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .preset-btn span { display: block; color: var(--muted); font-size: 10px; }
+
+    .jobs-list { margin-top: 16px; }
+
+    .job-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .job-info { flex: 1; }
+    .job-info strong { font-size: 13px; }
+    .job-info small { font-size: 11px; color: var(--muted); }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .btn-icon:hover { color: #ef4444; }
+
+    /* ── Right Panel (Output) ── */
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .output-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+    }
+
+    .output-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .output-header .gen-badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
+    .output-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      text-align: center;
+      gap: 8px;
+    }
+
+    .empty-state .icon { font-size: 48px; }
+    .empty-state h3 { font-size: 16px; font-weight: 500; color: var(--text); }
+    .empty-state p { font-size: 13px; max-width: 300px; }
+
+    .output-content {
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      font-family: inherit;
+    }
+
+    .output-content strong { color: var(--accent); }
+
+    /* Markdown-style rendering */
+    .hook-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: border-color 0.15s;
+    }
+
+    .hook-card:hover { border-color: var(--accent); }
+
+    .hook-card .hook-num {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+
+    .hook-text {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.5;
+      color: var(--text);
+      margin-bottom: 14px;
+      padding-right: 40px;
+    }
+
+    .hook-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .meta-tag {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
+    .meta-tag.formula { color: var(--blue); }
+    .meta-tag.category { color: var(--green); }
+
+    .copy-btn {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Streaming text */
+    .streaming-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .thinking-text {
+      font-size: 12px;
+      color: var(--muted);
+      font-style: italic;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border-radius: 6px;
+      margin-bottom: 12px;
+      border-left: 2px solid var(--border);
+      max-height: 60px;
+      overflow: hidden;
+    }
+
+    .tool-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--blue);
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    .spinning { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .action-bar {
+      padding: 12px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      background: var(--surface);
+    }
+
+    .action-bar .btn {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .separator {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      margin-top: 4px;
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🍳</div>
+  <h1>Posha Hook Generator</h1>
+  <span class="badge">claude-sonnet-4</span>
+</header>
+
+<div class="status-bar" id="statusBar">
+  <span><span class="dot"></span>Loading...</span>
+</div>
+
+<div class="main">
+  <!-- Left Panel -->
+  <aside class="panel-left">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('generate')">Generate</button>
+      <button class="tab" onclick="switchTab('schedule')">Schedule</button>
+      <button class="tab" onclick="switchTab('resources')">Resources</button>
+    </div>
+
+    <!-- Generate Tab -->
+    <div id="tab-generate" class="tab-content active">
+      <div class="section-title">Creator</div>
+      <div class="form-group">
+        <label>Quick Select</label>
+        <div class="creator-chips">
+          <span class="chip" onclick="selectCreator(this, 'Jacob')">Jacob</span>
+          <span class="chip" onclick="selectCreator(this, 'Cassandra')">Cassandra</span>
+          <span class="chip" onclick="selectCreator(this, 'Madilynn')">Madilynn</span>
+          <span class="chip" onclick="selectCreator(this, 'Erika')">Erika</span>
+        </div>
+        <input type="text" id="creatorName" placeholder="Or type custom name…">
+      </div>
+
+      <div class="form-group">
+        <label>Creator Notes & Brief</label>
+        <textarea id="creatorNotes" placeholder="Content style, audience, recent posts, what's working, tone, specific recipe ideas…"></textarea>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="section-title">Hook Options</div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="category">
+          <option value="">Any (let AI choose)</option>
+          <option value="curiosity">Curiosity-Driven</option>
+          <option value="problem-solution">Problem-Solution</option>
+          <option value="storytelling">Storytelling</option>
+          <option value="tips-tricks">Tips & Tricks</option>
+          <option value="shocking-truth">Shocking Truth</option>
+          <option value="question">Question-Based</option>
+          <option value="relatable">Relatable</option>
+          <option value="humor">Humor & Entertainment</option>
+          <option value="authority">Authority & Expertise</option>
+          <option value="inspirational">Inspirational</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Number of Hooks</label>
+        <div class="count-row">
+          <input type="range" id="countSlider" min="1" max="15" value="5" oninput="document.getElementById('countVal').textContent=this.value">
+          <span class="count-val" id="countVal">5</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="toggle-row">
+          <div class="toggle-label">
+            Web Research
+            <small>Search for what's trending for this creator/niche</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="researchToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="generateBtn" onclick="generateHooks()">
+        Generate Hooks
+      </button>
+      <button class="btn btn-secondary" onclick="clearOutput()">Clear Output</button>
+    </div>
+
+    <!-- Schedule Tab -->
+    <div id="tab-schedule" class="tab-content">
+      <div class="section-title">New Scheduled Job</div>
+      <div class="form-group">
+        <label>Job ID</label>
+        <input type="text" id="jobId" placeholder="e.g. daily-jacob">
+      </div>
+
+      <div class="form-group">
+        <label>Cron Schedule</label>
+        <div class="cron-presets">
+          <button class="preset-btn" onclick="setCron('0 9 * * *')">Daily 9am <span>0 9 * * *</span></button>
+          <button class="preset-btn" onclick="setCron('0 9 * * 1')">Weekly Mon <span>0 9 * * 1</span></button>
+          <button class="preset-btn" onclick="setCron('0 9,17 * * *')">Twice daily <span>0 9,17 * * *</span></button>
+          <button class="preset-btn" onclick="setCron('0 9 * * 1,4')">Mon & Thu <span>0 9 * * 1,4</span></button>
+        </div>
+        <input type="text" id="cronExpr" placeholder="Custom cron expression…">
+      </div>
+
+      <div class="form-group">
+        <label>Creator</label>
+        <input type="text" id="schedCreator" placeholder="Creator name">
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="schedNotes" placeholder="Brief notes for scheduled generation" style="min-height:60px"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Hooks per run</label>
+        <input type="text" id="schedCount" value="5">
+      </div>
+
+      <button class="btn btn-primary" onclick="createJob()">Schedule Job</button>
+
+      <div class="jobs-list" id="jobsList">
+        <div class="section-title" style="margin-top:16px">Active Jobs</div>
+        <p style="color:var(--muted);font-size:12px">No jobs scheduled yet.</p>
+      </div>
+    </div>
+
+    <!-- Resources Tab -->
+    <div id="tab-resources" class="tab-content">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">All files in <code style="background:var(--surface2);padding:2px 5px;border-radius:3px">resources/</code> are loaded as context. Drop in any .md file to extend the knowledge base.</p>
+      <div id="resourcesList" style="font-size:12px;color:var(--muted)">Loading…</div>
+    </div>
+  </aside>
+
+  <!-- Right Panel -->
+  <main class="panel-right">
+    <div class="output-header">
+      <h2 id="outputTitle">Output</h2>
+      <span class="gen-badge" id="genBadge">Ready</span>
+    </div>
+
+    <div class="output-area" id="outputArea">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🪝</div>
+        <h3>No hooks yet</h3>
+        <p>Configure your creator settings and click Generate to create Posha-specific hooks.</p>
+      </div>
+      <div id="thinkingArea" style="display:none"></div>
+      <div id="outputContent" style="display:none" class="streaming-text"></div>
+    </div>
+
+    <div class="action-bar" id="actionBar" style="display:none">
+      <button class="btn btn-secondary" onclick="copyAll()">Copy All</button>
+      <button class="btn btn-secondary" onclick="downloadMD()">Download .md</button>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────────
+  let currentOutput = '';
+  let isGenerating = false;
+
+  // ─── Init ─────────────────────────────────────────────────────────────────────
+  async function init() {
+    await loadStatus();
+    await loadResources();
+    await loadJobs();
+  }
+
+  async function loadStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+      document.getElementById('statusBar').innerHTML =
+        `<span><span class="dot"></span>${d.status === 'ok' ? 'Connected' : 'Error'}</span>
+         <span>${d.hookFiles} hook vault files</span>
+         <span>${d.resourceFiles} total resources</span>
+         <span>${d.scheduledJobs} scheduled jobs</span>
+         <span>Model: ${d.model}</span>`;
+    } catch (e) {
+      document.getElementById('statusBar').innerHTML = `<span style="color:#ef4444">⚠ Server not reachable</span>`;
+    }
+  }
+
+  async function loadResources() {
+    try {
+      const r = await fetch('/api/resources');
+      const d = await r.json();
+      const el = document.getElementById('resourcesList');
+      el.innerHTML = d.files.map(f =>
+        `<div style="padding:4px 0;border-bottom:1px solid var(--border)">${f}</div>`
+      ).join('');
+    } catch (e) {}
+  }
+
+  async function loadJobs() {
+    try {
+      const r = await fetch('/api/schedule');
+      const d = await r.json();
+      renderJobs(d.jobs);
+    } catch (e) {}
+  }
+
+  function renderJobs(jobs) {
+    const el = document.getElementById('jobsList');
+    if (!jobs.length) {
+      el.innerHTML = `<div class="section-title" style="margin-top:16px">Active Jobs</div><p style="color:var(--muted);font-size:12px">No jobs scheduled yet.</p>`;
+      return;
+    }
+    el.innerHTML = `<div class="section-title" style="margin-top:16px">Active Jobs</div>` +
+      jobs.map(j => `
+        <div class="job-item">
+          <div class="job-info">
+            <strong>${j.id}</strong><br>
+            <small>${j.cronExpression} • ${j.config.creatorName || 'Any creator'}</small>
+          </div>
+          <button class="btn-icon" onclick="deleteJob('${j.id}')" title="Delete">✕</button>
+        </div>
+      `).join('');
+  }
+
+  // ─── Tab Switching ────────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const tabs = ['generate', 'schedule', 'resources'];
+      t.classList.toggle('active', tabs[i] === name);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+  }
+
+  // ─── Creator Selection ────────────────────────────────────────────────────────
+  function selectCreator(el, name) {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('creatorName').value = name;
+
+    // Auto-populate notes based on known creators
+    const notes = {
+      'Jacob': 'Relatable family guy, dad content, humor-forward. Audience: working dads and parents. Style: casual, self-deprecating, funny. Shows real kitchen situations.',
+      'Cassandra': 'Lifestyle & wellness focus. Audience: health-conscious women 25-40. Style: aesthetic, aspirational. Emphasizes clean eating and beautiful results.',
+      'Madilynn': 'Busy mom energy. Audience: parents who want home-cooked meals without the time sink. Style: honest, real, occasionally chaotic.',
+      'Erika': 'Food enthusiast. Audience: foodies and home cooks. Style: enthusiastic, recipe-focused, showcases Posha\'s recipe variety and quality.',
+    };
+    if (notes[name]) document.getElementById('creatorNotes').value = notes[name];
+  }
+
+  // ─── Hook Generation ──────────────────────────────────────────────────────────
+  async function generateHooks() {
+    if (isGenerating) return;
+    isGenerating = true;
+
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+
+    const emptyState = document.getElementById('emptyState');
+    const thinkingArea = document.getElementById('thinkingArea');
+    const outputContent = document.getElementById('outputContent');
+    const actionBar = document.getElementById('actionBar');
+
+    emptyState.style.display = 'none';
+    thinkingArea.style.display = 'none';
+    thinkingArea.innerHTML = '';
+    outputContent.style.display = 'block';
+    outputContent.innerHTML = '';
+    actionBar.style.display = 'none';
+    currentOutput = '';
+
+    document.getElementById('genBadge').textContent = 'Generating…';
+    document.getElementById('outputTitle').textContent = 'Generating Hooks';
+
+    const payload = {
+      creatorName: document.getElementById('creatorName').value,
+      creatorNotes: document.getElementById('creatorNotes').value,
+      category: document.getElementById('category').value,
+      count: parseInt(document.getElementById('countSlider').value),
+      research: document.getElementById('researchToggle').checked,
+    };
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'thinking') {
+              thinkingArea.style.display = 'block';
+              thinkingArea.innerHTML = `<div class="thinking-text">💭 ${data.text.substring(0, 120)}…</div>`;
+            } else if (data.type === 'tool_start') {
+              outputContent.innerHTML += `<div class="tool-badge"><span class="spinning">⟳</span> Researching with ${data.name}…</div>`;
+            } else if (data.type === 'text') {
+              currentOutput += data.text;
+              outputContent.innerHTML = renderMarkdown(currentOutput);
+              document.getElementById('outputArea').scrollTop = 999999;
+            } else if (data.type === 'done') {
+              document.getElementById('genBadge').textContent = 'Done';
+              document.getElementById('outputTitle').textContent = 'Generated Hooks';
+              actionBar.style.display = 'flex';
+            } else if (data.type === 'error') {
+              outputContent.innerHTML += `<div style="color:#ef4444;padding:12px;background:rgba(239,68,68,0.1);border-radius:8px">Error: ${data.message}</div>`;
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      outputContent.innerHTML = `<div style="color:#ef4444">Connection error: ${err.message}</div>`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Generate Hooks';
+    isGenerating = false;
+  }
+
+  // ─── Markdown-ish Renderer ────────────────────────────────────────────────────
+  function renderMarkdown(text) {
+    // Escape HTML
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // Convert **bold**
+    let html = esc(text)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^#{1,3} (.+)$/gm, '<h3 style="color:var(--accent);margin:16px 0 8px;font-size:15px">$1</h3>')
+      .replace(/^---$/gm, '<hr style="border-color:var(--border);margin:16px 0">')
+      .replace(/\n/g, '<br>');
+
+    return `<div class="output-content">${html}</div>`;
+  }
+
+  function clearOutput() {
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('outputContent').style.display = 'none';
+    document.getElementById('thinkingArea').style.display = 'none';
+    document.getElementById('actionBar').style.display = 'none';
+    document.getElementById('genBadge').textContent = 'Ready';
+    document.getElementById('outputTitle').textContent = 'Output';
+    currentOutput = '';
+  }
+
+  // ─── Copy / Download ──────────────────────────────────────────────────────────
+  function copyAll() {
+    navigator.clipboard.writeText(currentOutput).then(() => {
+      const btn = event.target;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy All', 2000);
+    });
+  }
+
+  function downloadMD() {
+    const creator = document.getElementById('creatorName').value || 'posha';
+    const timestamp = new Date().toISOString().slice(0,10);
+    const blob = new Blob([currentOutput], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `posha-hooks-${creator}-${timestamp}.md`;
+    a.click();
+  }
+
+  // ─── Scheduling ───────────────────────────────────────────────────────────────
+  function setCron(expr) { document.getElementById('cronExpr').value = expr; }
+
+  async function createJob() {
+    const id = document.getElementById('jobId').value.trim();
+    const cronExpression = document.getElementById('cronExpr').value.trim();
+    const creatorName = document.getElementById('schedCreator').value.trim();
+    const creatorNotes = document.getElementById('schedNotes').value.trim();
+    const count = parseInt(document.getElementById('schedCount').value) || 5;
+
+    if (!id || !cronExpression) { alert('Job ID and cron expression required.'); return; }
+
+    try {
+      const r = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, cronExpression, config: { creatorName, creatorNotes, count } }),
+      });
+      const d = await r.json();
+      if (d.error) { alert(d.error); return; }
+      await loadJobs();
+      alert(`Job "${id}" scheduled!`);
+    } catch (e) { alert('Failed to create job: ' + e.message); }
+  }
+
+  async function deleteJob(id) {
+    if (!confirm(`Delete job "${id}"?`)) return;
+    await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+    await loadJobs();
+  }
+
+  // ─── Boot ─────────────────────────────────────────────────────────────────────
+  init();
+</script>
+</body>
+</html>

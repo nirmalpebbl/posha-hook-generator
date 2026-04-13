@@ -1,0 +1,3 @@
+# Stop doing (PAIN POINT OF TARGET AUDIENCE) right now! Instead (DESIRED RESULT)
+
+Example: Stop doing these unhealthy habits right now! Instead…

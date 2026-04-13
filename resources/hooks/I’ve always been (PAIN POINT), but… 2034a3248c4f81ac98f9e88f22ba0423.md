@@ -1,0 +1,3 @@
+# I’ve always been (PAIN POINT), but…
+
+Example: I've always been risk-averse, but here's how I overcame it‍
