@@ -1,8 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import express from 'express';
 import cors from 'cors';
-import cron from 'node-cron';
-import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -11,7 +10,6 @@ dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -24,20 +22,24 @@ function loadResources() {
   const resources = {};
 
   function scanDir(dir, prefix = '') {
-    const entries = readdirSync(dir);
-    for (const entry of entries) {
-      const fullPath = join(dir, entry);
-      const stat = statSync(fullPath);
-      if (stat.isDirectory()) {
-        scanDir(fullPath, prefix + entry + '/');
-      } else if (extname(entry) === '.md') {
-        const key = prefix + entry;
-        try {
-          resources[key] = readFileSync(fullPath, 'utf-8');
-        } catch (e) {
-          console.warn(`Could not read ${fullPath}: ${e.message}`);
+    try {
+      const entries = readdirSync(dir);
+      for (const entry of entries) {
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanDir(fullPath, prefix + entry + '/');
+        } else if (extname(entry) === '.md') {
+          const key = prefix + entry;
+          try {
+            resources[key] = readFileSync(fullPath, 'utf-8');
+          } catch (e) {
+            console.warn(`Could not read ${fullPath}: ${e.message}`);
+          }
         }
       }
+    } catch (e) {
+      console.warn(`Could not scan dir ${dir}: ${e.message}`);
     }
   }
 
@@ -107,22 +109,14 @@ For each hook, provide:
 Generate hooks that are ready to use — no placeholders, no templates. Always Posha-specific.`;
 }
 
-// ─── Anthropic Client ─────────────────────────────────────────────────────────
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// ─── Web Search Tool ──────────────────────────────────────────────────────────
-
-const webSearchTool = {
-  type: 'web_search_20250305',
-  name: 'web_search',
-};
 
 // ─── Hook Generation ──────────────────────────────────────────────────────────
 
-async function generateHooks({ creatorName, creatorNotes, category, count = 5, research = false }, onChunk) {
+async function generateHooks({ apiKey, creatorName, creatorNotes, category, count = 5, research = false }, onChunk) {
+  const client = new Anthropic({
+    apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
+  });
+
   const resources = loadResources();
   const systemPrompt = buildSystemPrompt(resources);
 
@@ -140,13 +134,7 @@ async function generateHooks({ creatorName, creatorNotes, category, count = 5, r
     userMessage += `\n\n**Preferred Hook Category:** ${category}`;
   }
 
-  if (research) {
-    userMessage += `\n\n**Research Mode ON:** First search the web for current trends, viral hooks, and what's working in the cooking/kitchen/food automation space on TikTok and Instagram Reels in 2024-2025. Then use those insights to make the hooks even more relevant and timely.`;
-  }
-
   userMessage += `\n\nMake each hook distinct — vary the formula, emotional trigger, and angle. Ensure all hooks are 100% Posha-specific with no unfilled placeholders.`;
-
-  const tools = research ? [webSearchTool] : [];
 
   console.log(`[API] Sending request — model: claude-sonnet-4-20250514, system prompt: ${systemPrompt.length} chars, user message: ${userMessage.length} chars`);
 
@@ -155,7 +143,6 @@ async function generateHooks({ creatorName, creatorNotes, category, count = 5, r
     max_tokens: 4000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
-    ...(tools.length > 0 ? { tools } : {}),
   });
 
   for await (const event of stream) {
@@ -175,48 +162,8 @@ async function generateHooks({ creatorName, creatorNotes, category, count = 5, r
   }
 }
 
-// ─── Scheduled Generation ─────────────────────────────────────────────────────
-
-const scheduledJobs = new Map();
-const generatedHooksLog = [];
-
-function ensureOutputDir() {
-  const dir = join(__dirname, 'generated');
-  if (!existsSync(dir)) mkdirSync(dir);
-  return dir;
-}
-
-function scheduleJob(id, cronExpression, config) {
-  if (scheduledJobs.has(id)) {
-    scheduledJobs.get(id).task.stop();
-  }
-
-  const task = cron.schedule(cronExpression, async () => {
-    console.log(`[Scheduled] Running hook generation job: ${id}`);
-    const chunks = [];
-    try {
-      await generateHooks(config, (chunk) => {
-        if (chunk.type === 'text') chunks.push(chunk.text);
-      });
-      const result = chunks.join('');
-      const timestamp = new Date().toISOString();
-      const outputDir = ensureOutputDir();
-      const filename = join(outputDir, `${id}-${timestamp.replace(/[:.]/g, '-')}.md`);
-      writeFileSync(filename, `# Posha Hooks — ${timestamp}\n\n${result}`);
-      generatedHooksLog.push({ id, timestamp, filename, preview: result.substring(0, 200) });
-      console.log(`[Scheduled] Saved hooks to ${filename}`);
-    } catch (e) {
-      console.error(`[Scheduled] Job ${id} failed:`, e.message);
-    }
-  });
-
-  scheduledJobs.set(id, { task, cronExpression, config });
-  console.log(`[Scheduled] Job ${id} scheduled: ${cronExpression}`);
-}
-
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
-// GET /api/status — health check + resource count
 app.get('/api/status', (req, res) => {
   const resources = loadResources();
   const hookFiles = Object.keys(resources).filter(k => k.startsWith('hooks/')).length;
@@ -224,12 +171,10 @@ app.get('/api/status', (req, res) => {
     status: 'ok',
     resourceFiles: Object.keys(resources).length,
     hookFiles,
-    scheduledJobs: scheduledJobs.size,
     model: 'claude-sonnet-4-20250514',
   });
 });
 
-// GET /api/resources — list available resource files
 app.get('/api/resources', (req, res) => {
   const resources = loadResources();
   res.json({
@@ -238,9 +183,13 @@ app.get('/api/resources', (req, res) => {
   });
 });
 
-// POST /api/generate — generate hooks (streaming SSE)
 app.post('/api/generate', async (req, res) => {
   const { creatorName, creatorNotes, category, count, research } = req.body;
+  const apiKey = req.headers['x-anthropic-api-key'];
+
+  if (!apiKey && !process.env.ANTHROPIC_API_KEY) {
+    return res.status(401).json({ error: 'Missing Anthropic API Key. Please provide one.' });
+  }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -251,7 +200,7 @@ app.post('/api/generate', async (req, res) => {
 
   try {
     await generateHooks(
-      { creatorName, creatorNotes, category, count: count || 5, research: research || false },
+      { apiKey, creatorName, creatorNotes, category, count: count || 5, research: research || false },
       (chunk) => send(chunk)
     );
   } catch (err) {
@@ -261,46 +210,14 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-// GET /api/schedule — list scheduled jobs
-app.get('/api/schedule', (req, res) => {
-  const jobs = [];
-  for (const [id, { cronExpression, config }] of scheduledJobs) {
-    jobs.push({ id, cronExpression, config });
-  }
-  res.json({ jobs, recentLogs: generatedHooksLog.slice(-10) });
-});
+// Vercel serverless functions require exporting the express app
+export default app;
 
-// POST /api/schedule — create or update a scheduled job
-app.post('/api/schedule', (req, res) => {
-  const { id, cronExpression, config } = req.body;
-  if (!id || !cronExpression || !config) {
-    return res.status(400).json({ error: 'id, cronExpression, and config are required' });
-  }
-  if (!cron.validate(cronExpression)) {
-    return res.status(400).json({ error: 'Invalid cron expression' });
-  }
-  scheduleJob(id, cronExpression, config);
-  res.json({ success: true, id, cronExpression });
-});
-
-// DELETE /api/schedule/:id — remove a scheduled job
-app.delete('/api/schedule/:id', (req, res) => {
-  const { id } = req.params;
-  if (scheduledJobs.has(id)) {
-    scheduledJobs.get(id).task.stop();
-    scheduledJobs.delete(id);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Job not found' });
-  }
-});
-
-// ─── Start Server ─────────────────────────────────────────────────────────────
-
-app.listen(PORT, () => {
-  console.log(`\n🍳 Posha Hook Generator running at http://localhost:${PORT}`);
-  const resources = loadResources();
-  const hookCount = Object.keys(resources).filter(k => k.startsWith('hooks/')).length;
-  console.log(`📚 Loaded ${Object.keys(resources).length} resource files (${hookCount} hook vault files)`);
-  console.log(`🤖 Model: claude-sonnet-4-20250514 with adaptive thinking\n`);
-});
+// Start server if running locally (not in Vercel)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`\n🍳 Posha Hook Generator running at http://localhost:${PORT}`);
+    console.log(`🤖 Model: claude-sonnet-4-20250514\n`);
+  });
+}
